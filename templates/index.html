@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI ChatBot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+
+  <div class="chat-wrapper">
+
+    <header class="chat-header">
+      <div class="avatar">🤖</div>
+      <div class="header-info">
+        <h1>ChatBot</h1>
+        <span class="status">● Online</span>
+      </div>
+      <button class="clear-btn" id="clearBtn" title="Clear chat">🗑️</button>
+    </header>
+
+    <main class="chat-window" id="chatWindow">
+
+      <!-- Welcome message always shown first -->
+      <div class="message bot">
+        <div class="bubble">👋 Hello! I'm your AI assistant. Type a message to get started!</div>
+      </div>
+
+      <!-- Render session history on page load -->
+      {% for msg in chat_history %}
+        <div class="message {{ msg.sender }}">
+          <div class="bubble">{{ msg.text }}</div>
+        </div>
+      {% endfor %}
+
+    </main>
+
+    <footer class="chat-footer">
+      <div class="input-row">
+        <input
+          type="text"
+          id="userInput"
+          placeholder="Type a message..."
+          autocomplete="off"
+        />
+        <button id="sendBtn">Send</button>
+      </div>
+      <p class="hint">Try: hello · how are you · what can you do · bye</p>
+    </footer>
+
+  </div>
+
+  <script>
+    const chatWindow = document.getElementById("chatWindow");
+    const userInput  = document.getElementById("userInput");
+    const sendBtn    = document.getElementById("sendBtn");
+    const clearBtn   = document.getElementById("clearBtn");
+
+    function scrollToBottom() {
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    function appendMessage(sender, text) {
+      const wrapper = document.createElement("div");
+      wrapper.classList.add("message", sender);
+
+      const bubble = document.createElement("div");
+      bubble.classList.add("bubble");
+      bubble.textContent = text;
+
+      wrapper.appendChild(bubble);
+      chatWindow.appendChild(wrapper);
+      scrollToBottom();
+    }
+
+    function showTyping() {
+      const wrapper = document.createElement("div");
+      wrapper.classList.add("message", "bot");
+      wrapper.id = "typingIndicator";
+
+      const bubble = document.createElement("div");
+      bubble.classList.add("bubble", "typing");
+      bubble.innerHTML = "<span></span><span></span><span></span>";
+
+      wrapper.appendChild(bubble);
+      chatWindow.appendChild(wrapper);
+      scrollToBottom();
+    }
+
+    function removeTyping() {
+      const indicator = document.getElementById("typingIndicator");
+      if (indicator) indicator.remove();
+    }
+
+    async function sendMessage() {
+      const text = userInput.value.trim();
+      if (!text) return;
+
+      appendMessage("user", text);
+      userInput.value = "";
+      sendBtn.disabled = true;
+      showTyping();
+
+      try {
+        const res = await fetch("/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text }),
+        });
+        const data = await res.json();
+        removeTyping();
+        appendMessage("bot", data.reply);
+      } catch (err) {
+        removeTyping();
+        appendMessage("bot", "Oops! Something went wrong. Please try again.");
+      } finally {
+        sendBtn.disabled = false;
+        userInput.focus();
+      }
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+
+    userInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendMessage();
+    });
+
+    clearBtn.addEventListener("click", async () => {
+      await fetch("/clear", { method: "POST" });
+      // Remove everything after the welcome message
+      const messages = chatWindow.querySelectorAll(".message");
+      messages.forEach((m, i) => { if (i > 0) m.remove(); });
+    });
+
+    scrollToBottom();
+  </script>
+
+</body>
+</html>
